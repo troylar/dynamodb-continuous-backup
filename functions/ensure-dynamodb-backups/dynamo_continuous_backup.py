@@ -17,7 +17,6 @@ sys.path.append('lib')
 import time
 import boto3
 import botocore
-import hjson
 
 
 config = None

@@ -7,13 +7,13 @@
         "build": "pip install -r requirements.txt -t ."
     },
     "environment": {
-        "FIREHOSE_DELIVERY_BUCKET": "test_bucket",
+        "FIREHOSE_DELIVERY_BUCKET": "dynamodb-backups-troy",
         "FIREHOSE_DELIVERY_PREFIX": "dynamodb/backup",
-        "FIREHOSE_DELIVERY_ROLE_ARN": "arn:aws:iam::<my account number>:role/firehose_delivery_role",
+        "FIREHOSE_DELIVERY_ROLE_ARN": "arn:aws:iam::945491187035:role/ddb_backup_firehose_role",
         "FIREHOSE_DELIVERY_SIZE_IN_MB": "128",
         "FIREHOSE_DELIVERY_INTERVAL_SECONDS": "60",
-        "LAMBDA_EXEC_ROLE_ARN": "arn:aws:iam::<my account number>:role/LambdaExecRole",
-        "CLOUD_WATCH_ROLE_ARN": "arn:aws:iam::<my account number>:role/CloudWatchEventsRole",
+        "LAMBDA_EXEC_ROLE_ARN": "arn:aws:iam::945491187035:role/ddb_backup_lambda_role",
+        "CLOUD_WATCH_ROLE_ARN": "arn:aws:iam::945491187035:role/CloudWatchEventsRole",
         "STREAM_MAX_RECORDS_BATCH": "1000",
         "TABLE_NAME_MATCH_REGEX": "*"
     }

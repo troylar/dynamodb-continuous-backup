@@ -34,7 +34,7 @@ def table_regex_optin(dynamo_table_name):
         if "tableNameMatchRegex" in config:
             global regex_pattern
             if regex_pattern == None:
-                regex_pattern = re.compile(get_config_value('tableNameMatchRegex'))
+                regex_pattern = re.compile(os.environ['TABLE_NAME_MATCH_REGEX'])
 
             # check the regular expression match
             if regex_pattern.match(dynamo_table_name):
@@ -68,19 +68,6 @@ current_region = None
 firehose_client = None
 lambda_client = None
 
-
-'''
-Configuration accessor. Rule is to access the provided configuration first, and then fall back to Environment Variables
-'''
-def get_config_value(key):
-    if config != None and key in config:
-        return config[key]
-    elif key in os.environ:
-        return os.environ[key]
-    else:
-        raise Exception("Unable to establish location of Config. %s not found" % (key))
-
-
 '''
 Initialise the module with the provided or default configuration
 '''
@@ -92,28 +79,10 @@ def init(config_override):
     global firehose_client
     global lambda_client
 
-    config_file_name = None
-
-    if config == None:
-        # read the configuration file name from the config.loc file
-        if config_override == None:
-            if os.path.isfile(CONF_LOC):
-                config_file_name = open(CONF_LOC, 'r').read()
-                print "Using compiled configuration %s" % (config_file_name)
-            else:
-                # there's no configuration override, and no config pointer file, so we'll use environment variables for config only
-                print "No Configuration File supplied. Using Environment Variables"
-        else:
-            print "Using Config Override %s" % (config_override)
-            config_file_name = config_override
-
-        config = hjson.load(open(config_file_name, 'r'))
-        print "Loaded configuration from %s" % (config_file_name)
-
-    # load the region from the context
+        # load the region from the context
     if current_region == None:
         try:
-            current_region = os.environ.get('AWS_DEFAULT_REGION', os.environ[REGION_KEY])
+            current_region = os.environ['AWS_REGION']
             if current_region == None or current_region == '':
                 raise KeyError
         except KeyError:
@@ -173,24 +142,24 @@ def create_delivery_stream(for_table_name):
         response = firehose_client.create_delivery_stream(
             DeliveryStreamName=get_delivery_stream_name(for_table_name),
             S3DestinationConfiguration={
-                'RoleARN': get_config_value('firehoseDeliveryRoleArn'),
-                'BucketARN': 'arn:aws:s3:::' + get_config_value('firehoseDeliveryBucket'),
-                'Prefix': "%s/%s/" % (get_config_value('firehoseDeliveryPrefix'), for_table_name),
+                'RoleARN': os.environ['FIREHOSE_DELIVERY_ROLE_ARN'],
+                'BucketARN': 'arn:aws:s3:::' + os.environ['FIREHOSE_DELIVERY_BUCKET'],
+                'Prefix': "%s/%s/" % (os.environ['FIREHOSE_DELIVERY_PREFIX'], for_table_name),
                 'BufferingHints': {
-                    'SizeInMBs': get_config_value('firehoseDeliverySizeMB'),
-                    'IntervalInSeconds': get_config_value('firehoseDeliveryIntervalSeconds')
+                    'SizeInMBs': int(os.environ['FIREHOSE_DELIVERY_SIZE_IN_MB']),
+                    'IntervalInSeconds': int(os.environ['FIREHOSE_DELIVERY_INTERVAL_SECONDS'])
                 },
                 'CompressionFormat': 'GZIP'
             }
         )
-    
+
         print "Created new Firehose Delivery Stream %s" % (response["DeliveryStreamARN"])
-    
+
         return response["DeliveryStreamARN"]
     except botocore.exceptions.ClientError as e:
         print e
         raise e
-        
+
 
 
 '''
@@ -207,7 +176,7 @@ def ensure_firehose_delivery_stream(dynamo_table_name):
     response = None
 
     delivery_stream_name = get_delivery_stream_name(dynamo_table_name)
-    
+
     ok = False
     tries = 0
     try_count = 100
@@ -227,18 +196,18 @@ def ensure_firehose_delivery_stream(dynamo_table_name):
                 tries += 1
             else:
                 raise e
-    
+
     if not ok:
         raise Exception("Unable to resolve Firehose Delivery Stream presence in 100 attempts. Aborting")
     else:
         if response and response["DeliveryStreamDescription"]["DeliveryStreamARN"]:
             delivery_stream_arn = response["DeliveryStreamDescription"]["DeliveryStreamARN"]
-    
+
             return delivery_stream_arn
         else:
             # delivery stream doesn't exist, so create it
             delivery_stream_arn = create_delivery_stream(delivery_stream_name)
-    
+
         return delivery_stream_arn
 
 
@@ -255,7 +224,7 @@ def ensure_update_stream_event_source(dynamo_stream_arn):
             EventSourceArn=dynamo_stream_arn,
             FunctionName=function_arn,
             Enabled=True,
-            BatchSize=get_config_value('streamsMaxRecordsBatch'),
+            BatchSize=int(os.environ['STREAM_MAX_RECORDS_BATCH']),
             StartingPosition='TRIM_HORIZON'
         )
     except botocore.exceptions.ClientError as e:
@@ -275,13 +244,17 @@ def ensure_lambda_streams_to_firehose():
         response = lambda_client.get_function(FunctionName=LAMBDA_STREAMS_TO_FIREHOSE)
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            print LAMBDA_STREAMS_TO_FIREHOSE + " not found"
             pass
+        else:
+            print e.response['Error']
 
     if response and response["Configuration"]["FunctionArn"]:
         function_arn = response["Configuration"]["FunctionArn"]
+        print LAMBDA_STREAMS_TO_FIREHOSE + " exists"
     else:
         deployment_package = "%s/%s-%s.zip" % (LAMBDA_STREAMS_TO_FIREHOSE_PREFIX, LAMBDA_STREAMS_TO_FIREHOSE, LAMBDA_STREAMS_TO_FIREHOSE_VERSION)
-        
+
         # resolve the bucket based on region
         region_suffix = current_region
 
@@ -292,7 +265,7 @@ def ensure_lambda_streams_to_firehose():
             response = lambda_client.create_function(
                 FunctionName=LAMBDA_STREAMS_TO_FIREHOSE,
                 Runtime='nodejs4.3',
-                Role=get_config_value('lambdaExecRoleArn'),
+                Role=os.environ['LAMBDA_EXEC_ROLE_ARN'],
                 Handler='index.handler',
                 Code={
                     'S3Bucket': deploy_bucket,
@@ -306,6 +279,7 @@ def ensure_lambda_streams_to_firehose():
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == 'ResourceConflictException':
                 # the function somehow already exists, though the get previously failed
+                print "Function already exists"
                 pass
             else:
                 raise e

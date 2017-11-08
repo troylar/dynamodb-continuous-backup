@@ -17,8 +17,8 @@ resource "aws_iam_policy" "ddb_backup_policy" {
   policy = "${data.aws_iam_policy_document.ddb_backup_policy_document.json}"
 }
 
-resource "aws_iam_role" "dynamodb_backup_role" {
-  name = "dynamodb_backup_role"
+resource "aws_iam_role" "ddb_backup_cloudwatch_events_role" {
+  name = "ddb_backup_cloudwatch_events_role"
 
   assume_role_policy = <<EOF
 { 
@@ -39,10 +39,10 @@ EOF
 
 resource "aws_iam_policy_attachment" "ddb_backup_policy_attachment" {
   name  = "ddb_backup_policy_attachment"
-  roles = ["${aws_iam_role.dynamodb_backup_role.name}"]
+  roles = ["${aws_iam_role.ddb_backup_cloudwatch_events_role.name}"]
   policy_arn = "${aws_iam_policy.ddb_backup_policy.arn}"
 }
 
-output "ddb_role" {
-  value = "${aws_iam_role.dynamodb_backup_role.name}"
+output "ddb_backup_cloudwatch_events_role" {
+  value = "${aws_iam_role.ddb_backup_cloudwatch_events_role.name}"
 }

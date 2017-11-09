@@ -1,0 +1,8 @@
+{
+  "name": "continuous-dynamodb-backup",
+  "description": "",
+  "memory": 128,
+  "timeout": 5,
+  "role": "arn:aws:iam::945491187035:role/ddb_backup_lambda_role",
+  "environment": {}
+}

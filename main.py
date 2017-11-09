@@ -9,7 +9,7 @@ import dynamo_continuous_backup as backup
 config = None
 debug = True
 
-def handle(event, context):
+def handler(event, context):
     if 'detail' in event and 'errorCode' in event['detail']:
         # anything that comes in with errors is ignored
         if debug == True:

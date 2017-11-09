@@ -12,12 +12,11 @@ lib64/
 parts/
 sdist/
 var/
+venv/
+node_modules/
 *.egg-info/
 .installed.cfg
 *.egg
 
 # Serverless directories
 .serverless
-venv/
-node_modules/
-*.tfstate*
